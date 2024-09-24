@@ -1,98 +1,120 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread
 from queue import Queue
+import os
 
 
-G = 23786635532332886537261431906453031264918297
-P = 632158881801130885249042417232212770524741295422564233061391190031954228421232913648184592218883487397503624904102572293826728806813079
+class Connection:
+	def __init__(self, type, address, port):
+		self.type = type
+		self.queue = Queue()
+		self.hostport = (address, port)
+
+		self.conn = None
+		self.thread = None
+		self.prefix = None
+		self.connected = False
+
+	def setup(self):
+		if self.type == "server":
+			self.prefix = "SEND"
+			self.conn = socket(AF_INET, SOCK_STREAM)
+			self.conn.connect(self.hostport)
+			print("Toxic connected to Habbo server")
+
+		if self.type == "client":
+			self.prefix = "RECV"
+			s = socket(AF_INET, SOCK_STREAM)
+			s.bind(self.hostport)
+			s.listen()
+			print("Waiting for connection...")
+			self.conn, _ = s.accept()
+			print("Habbo client connected to Toxic")
+
+		self.connected = True
+
+	def process(self):
+		while self.connected:
+			packet = self.conn.recv(32768)
+			if len(packet) > 0:
+				print(f"{self.prefix}:", str(packet)[2:-1])
+				self.queue.put(packet)
+			else:
+				self.stop()
+
+	def start(self):
+		self.thread = Thread(target=self.process, args=[])
+		self.thread.daemon = True
+		self.thread.start()
+
+	def stop(self):
+		self.connected = False
+		self.conn.close()
+		
+	def join(self):
+		self.thread.join()
+		self.stop()
 
 
-def server_process(server_socket, server_queue):
-	while True:
-		server_data = server_socket.recv(1024)
-		if len(server_data) == 0:
-			exit()
+class MITM:
+	def __init__(self, client, server):
+		self.client = client
+		self.server = server
 
-		print("SEND:", str(server_data)[2:-1])
-		server_queue.put(server_data)
+		self.thread = None
+		self.processing = False
+
+	def process(self):
+		while self.processing:
+			try:
+				while not self.server.queue.empty():
+					packet = self.server.queue.get()
+					self.client.conn.sendall(packet)
+
+				while not self.client.queue.empty():
+					packet = self.client.queue.get()
+					self.server.conn.sendall(packet)
+
+			except Exception as e:
+				print("MITM process error:", e)
+				self.stop()
+
+	def start(self):
+		self.thread = Thread(target=self.process, args=[])
+		self.thread.daemon = True
+		self.processing = True
+		self.thread.start()
+
+	def stop(self):
+		self.processing = False
+		self.client.stop()
+		self.server.stop()
+
+	def join(self):
+		self.thread.join()
+		self.stop()
 
 
-def client_process(client_socket, client_queue):
-	while True:
-		client_data = client_socket.recv(1024)
-		if len(client_data) == 0:
-			exit()
+def main():
+	client = Connection("client", "localhost", 40_001)
+	client.setup()
+	client.start()
+	
+	server = Connection("server", "18.199.57.67", 40_001)
+	server.setup()
+	server.start()
+	
+	mitm = MITM(client, server)
+	mitm.start()
 
-		print("RECV:", str(client_data)[2:-1])
-		client_queue.put(client_data)
-
-
-def main_process(server_socket, client_socket, server_queue, client_queue):
 	try:
-		while True:
-			while not server_queue.empty():
-				server_packet = server_queue.get()
-				client_socket.sendall(server_packet)
-
-			while not client_queue.empty():
-				client_packet = client_queue.get()
-				server_socket.sendall(client_packet)
-
-	except:
-		print("Socket error, quitting...")
-		exit()
-
-
-def main(address, port):
-	server_queue = Queue()
-	client_queue = Queue()
-
-	s = socket(AF_INET, SOCK_STREAM)
-	s.bind(('localhost', port))
-	s.listen()
-
-	print("Waiting for connection...")
-	server_socket, _ = s.accept()
-
-	print("Habbo Client connected to packetlogger")
-
-	client_socket = socket(AF_INET, SOCK_STREAM)
-	client_socket.connect((address, port))
-	print("Packetlogger connected to Habbo Server")
-
-	client_thrad = Thread(
-		target=client_process,
-		args=[client_socket, client_queue]
-		)
-
-	server_thread = Thread(
-		target=server_process, 
-		args=[server_socket, server_queue]
-		)
-
-	main_thread = Thread(
-		target=main_process,
-		args=[server_socket, client_socket, server_queue, client_queue]
-		)
-
-	server_thread.start()
-	client_thrad.start()
-	main_thread.start()
-
-	print("MITM attack successful")
-
-	server_thread.join()
-	client_thrad.join()
-	main_thread.join()
-
-
-if __name__ == '__main__':
-	ADDRESS = '18.199.57.67'
-	PORT = 40_001
-
-	try:
-		main(ADDRESS, PORT)
-
+		mitm.join()
+		server.join()
+		client.join()
+		
 	except KeyboardInterrupt:
-		print("\nbye")
-		exit()
+		print("\nBYE")
+
+
+if __name__ == "__main__":
+	main()
