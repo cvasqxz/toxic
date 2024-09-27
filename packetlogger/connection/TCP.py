@@ -2,6 +2,8 @@ from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread
 from queue import Queue
 
+from utils.filters import bin2str
+
 
 class Socket:
 	def __init__(self, type, address, port):
@@ -16,13 +18,13 @@ class Socket:
 
 	def setup(self):
 		if self.type == "server":
-			self.prefix = "SEND"
+			self.prefix = "INCOMING"
 			self.conn = socket(AF_INET, SOCK_STREAM)
 			self.conn.connect(self.hostport)
 			print("Toxic connected to Habbo server")
 
 		if self.type == "client":
-			self.prefix = "RECV"
+			self.prefix = "OUTGOING"
 			s = socket(AF_INET, SOCK_STREAM)
 			s.bind(self.hostport)
 			s.listen()
@@ -36,7 +38,7 @@ class Socket:
 		while self.connected:
 			packet = self.conn.recv(32768)
 			if len(packet) > 0:
-				print(f"{self.prefix}:", str(packet)[2:-1])
+				print(f"[{self.prefix}]: {bin2str(packet)}")
 				self.queue.put(packet)
 			else:
 				self.stop()
