@@ -2,9 +2,9 @@ import string, re
 
 
 PRINTABLE = string.ascii_letters + \
-            string.punctuation + \
-            string.digits + \
-            'áéíóúñÁÉÍÓÚÑ' + chr(32)
+			string.punctuation + \
+			string.digits + \
+			'áéíóúñÁÉÍÓÚÑ' + chr(32)
 
 
 def bin2str(binary_packet):
