@@ -7,15 +7,15 @@ possible_table = "cfa4debb4f28d4279d0f668aabba13810b8f7f4c7917eb1618296937c852d0
 first_encrypted = "OaVKtwJ6BQni0004ZW4i56T9GNqb8jfdSdnPi97I8PvZOrCNGr74sXsK26ygbS5D0b/VeNvFlyu7oISlJiQUgUQXE7=="
 
 for j in range(256):
-    rc4 = RC4Base64(
-        binascii.unhexlify(possible_table),
-        164,
-        j)
+    for q in range(256):
+        rc4 = RC4Base64(
+            binascii.unhexlify(possible_table),
+            q,
+            j)
 
-    rc4.undo_rc4(12)
-    decipher = rc4.decipher(base64.b64decode(first_encrypted))
-    if decipher != None:
-        print(j, 164, decipher)
+        rc4.undo_rc4(12)
+        decipher = rc4.decipher(base64.b64decode(first_encrypted))
+        print(j, q, decipher)
 
 
 '''
