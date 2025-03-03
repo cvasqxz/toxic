@@ -8,7 +8,6 @@ RC4_INVALID_VALUE = 65535  # Representación de u16 máximo
 hotelSettings = type("hotelSettings", (object,), {"tableAlignment": 8, "invalidMask": 0xFFFFFFFB_FFFFFF00})() # Se asume estos valores.
 
 
-from subprocess import check_output
 def get_pid(name):
 	try:
 		pid = subprocess.check_output(["pidof", name])
@@ -18,6 +17,7 @@ def get_pid(name):
 
 
 def checkMapOffset(startingIndex, buffer, bufferAddr, bufferLen):
+	possible_states = []
 	tableAlignment = 8
 	validEntries = 0
 	valueToIndex = [RC4_INVALID_VALUE] * RC4_TABLE_SIZE
@@ -42,8 +42,12 @@ def checkMapOffset(startingIndex, buffer, bufferAddr, bufferLen):
 			tablePos = i - ((RC4_TABLE_SIZE - 1) * tableAlignment)
 			tableAddr = bufferAddr + tablePos
 			tableSize = RC4_TABLE_SIZE * tableAlignment
-			check_valid(tableAddr, buffer[tablePos : tablePos + tableSize])
+			possible_state = check_valid(tableAddr, buffer[tablePos : tablePos + tableSize])
+			if possible_state != None:
+				possible_states.append(possible_state)
 		i += tableAlignment
+
+		return possible_states
 
 def check_valid(address, buffer):
     table_alignment = 8
@@ -54,16 +58,21 @@ def check_valid(address, buffer):
         value = struct.unpack("<Q", buffer[i:i + table_alignment].ljust(8, b'\x00'))[0]
         is_valid = (value & invalid_mask) == 0
         if not is_valid:
-            return
+            return None
         table[i // table_alignment] = value & 0xFF
         i += table_alignment
     print(f"Found potential RC4 table at: 0x{address:08x}")
     hex_string = "".join(f"{value:02x}" for value in table)
-    print(hex_string)
+    return hex_string
 
-pid = get_pid("Habbo.exe")
 
-if pid != None:
+def get_possible_states():
+	possible_states = []
+	pid = get_pid("Habbo.exe")
+
+	if pid == None:
+		return []
+
 	maps_file = open(f"/proc/{pid}/maps", 'r')
 	mem_file = open(f"/proc/{pid}/mem", 'rb', 0)
 
@@ -74,7 +83,8 @@ if pid != None:
 			end = int(m.group(2), 16)
 			mem_file.seek(start)  # seek to region start
 			chunk = mem_file.read(end - start)  # read region contents
-			checkMapOffset(8, chunk, start, end-start)
+			possible_states += checkMapOffset(8, chunk, start, end-start)
 	maps_file.close()
 	mem_file.close()
 
+	return possible_states

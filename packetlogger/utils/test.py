@@ -13,9 +13,12 @@ for j in range(256):
             q,
             j)
 
-        rc4.undo_rc4(12)
+        if rc4.undo_rc4(12) == False:
+            continue
+
         decipher = rc4.decipher(base64.b64decode(first_encrypted))
-        print(j, q, decipher)
+        if len(decipher) < 10:
+            print(j, q, decipher)
 
 
 '''

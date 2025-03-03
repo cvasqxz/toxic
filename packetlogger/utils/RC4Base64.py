@@ -142,8 +142,6 @@ def testRc4Base64():
 		152,
 		211)
 
-	print(binascii.hexlify(c.get_state()))
-
 	out = c.decipher(binascii.unhexlify("3270635A4F67"))
 	assert(binascii.hexlify(out) == b"01020304")
 
